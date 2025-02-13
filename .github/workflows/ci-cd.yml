@@ -33,22 +33,23 @@ jobs:
     needs: test
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Login to Heroku Container Registry
-        run: heroku container:login
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-
-      - name: Build and Push Docker Image
+      - name: Setup SSH
         run: |
-          heroku container:push web --app ${{ secrets.HEROKU_APP_NAME }}
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-
-      - name: Release the App
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H your-ec2-ip >> ~/.ssh/known_hosts
+  
+      - name: Deploy to EC2
         run: |
-          heroku container:release web --app ${{ secrets.HEROKU_APP_NAME }}
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          ssh ubuntu@your-ec2-ip << 'EOF'
+          cd fastapi-app
+          git pull origin main
+          source venv/bin/activate
+          pip install -r requirements.txt
+          sudo systemctl restart fastapi
+          sudo systemctl restart nginx
+          EOF
